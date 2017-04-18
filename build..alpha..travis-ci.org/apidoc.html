@@ -1,0 +1,327 @@
+<div class="apidocDiv">
+<style>
+/*csslint
+*/
+.apidocDiv {
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.apidocDiv a[href] {
+    color: #33f;
+    font-weight: bold;
+    text-decoration: none;
+}
+.apidocDiv a[href]:hover {
+    text-decoration: underline;
+}
+.apidocCodeCommentSpan {
+    background: #bbf;
+    color: #000;
+    display: block;
+}
+.apidocCodeKeywordSpan {
+    color: #d00;
+    font-weight: bold;
+}
+.apidocCodePre {
+    background: #eef;
+    border: 1px solid;
+    color: #777;
+    padding: 5px;
+    white-space: pre-wrap;
+}
+.apidocFooterDiv {
+    margin-top: 20px;
+    text-align: center;
+}
+.apidocModuleLi {
+    margin-top: 10px;
+}
+.apidocSectionDiv {
+    border-top: 1px solid;
+    margin-top: 20px;
+}
+.apidocSignatureSpan {
+    color: #777;
+    font-weight: bold;
+}
+</style>
+<h1>api documentation for
+    <a
+
+        href="https://github.com/tkyaji/cordova-plugin-crypt-file#readme"
+
+    >cordova-plugin-crypt-file (v1.3.2)</a>
+</h1>
+<h4>This plugin to encrypt/decrypt the source files.</h4>
+<div class="apidocSectionDiv"><a
+    href="#apidoc.tableOfContents"
+    id="apidoc.tableOfContents"
+><h1>table of contents</h1></a><ol>
+
+    <li class="apidocModuleLi"><a href="#apidoc.module.cordova-plugin-crypt-file">module cordova-plugin-crypt-file</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.cordova-plugin-crypt-file.after_prepare">
+            function <span class="apidocSignatureSpan">cordova-plugin-crypt-file.</span>after_prepare
+            <span class="apidocSignatureSpan">(context)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
+    <li class="apidocModuleLi"><a href="#apidoc.module.cordova-plugin-crypt-file.after_prepare">module cordova-plugin-crypt-file.after_prepare</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.cordova-plugin-crypt-file.after_prepare.after_prepare">
+            function <span class="apidocSignatureSpan">cordova-plugin-crypt-file.</span>after_prepare
+            <span class="apidocSignatureSpan">(context)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
+</ol></div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.cordova-plugin-crypt-file" id="apidoc.module.cordova-plugin-crypt-file">module cordova-plugin-crypt-file</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.cordova-plugin-crypt-file.after_prepare" id="apidoc.element.cordova-plugin-crypt-file.after_prepare">
+        function <span class="apidocSignatureSpan">cordova-plugin-crypt-file.</span>after_prepare
+        <span class="apidocSignatureSpan">(context)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">after_prepare = function (context) {
+
+    var path              = context.requireCordovaModule(&#x27;path&#x27;),
+        fs                = context.requireCordovaModule(&#x27;fs&#x27;),
+        crypto            = context.requireCordovaModule(&#x27;crypto&#x27;),
+        Q                 = context.requireCordovaModule(&#x27;q&#x27;),
+        cordova_util      = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/util&#x27;),
+        platforms         = context.requireCordovaModule(&#x27;cordova-lib/src/platforms/platforms&#x27;),
+        Parser            = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/metadata/parser&#x27;),
+        ParserHelper      = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/metadata/parserhelper/ParserHelper&#x27;),
+        ConfigParser      = context.requireCordovaModule(&#x27;cordova-common&#x27;).ConfigParser;
+
+    var deferral = new Q.defer();
+    var projectRoot = cordova_util.cdProjectRoot();
+
+    var key = crypto.randomBytes(24).toString(&#x27;base64&#x27;);
+    var iv = crypto.randomBytes(12).toString(&#x27;base64&#x27;);
+
+    console.log(&#x27;key=&#x27; + key + &#x27;, iv=&#x27; + iv)
+
+    var targetFiles = loadCryptFileTargets();
+
+    context.opts.platforms.filter(function(platform) {
+        var pluginInfo = context.opts.plugin.pluginInfo;
+        return pluginInfo.getPlatformsArray().indexOf(platform) &#x3e; -1;
+
+    }).forEach(function(platform) {
+        var platformPath = path.join(projectRoot, &#x27;platforms&#x27;, platform);
+        var platformApi = platforms.getPlatformApi(platform, platformPath);
+        var platformInfo = platformApi.getPlatformInfo();
+        var wwwDir = platformInfo.locations.www;
+
+        findCryptFiles(wwwDir).filter(function(file) {
+            return isCryptFile(file.replace(wwwDir, &#x27;&#x27;));
+        }).forEach(function(file) {
+            var content = fs.readFileSync(file, &#x27;utf-8&#x27;);
+            fs.writeFileSync(file, encryptData(content, key, iv), &#x27;utf-8&#x27;);
+            console.log(&#x27;encrypt: &#x27; + file);
+        });
+
+        if (platform == &#x27;ios&#x27;) {
+            var ios_parser = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/metadata/ios_parser&#x27;);
+            var iosParser = new ios_parser(platformPath);
+            var pluginDir = path.join(iosParser.cordovaproj, &#x27;Plugins&#x27;, context.opts.plugin.id);
+            replaceCryptKey_ios(pluginDir, key, iv);
+
+        } else if (platform == &#x27;android&#x27;) {
+            var pluginDir = path.join(platformPath, &#x27;src&#x27;);
+            replaceCryptKey_android(pluginDir, key, iv);
+
+            var cfg = new ConfigParser(platformInfo.projectConfig.path);
+            cfg.doc.getroot().getchildren().filter(function(child, idx, arr) {
+                return (child.tag == &#x27;content&#x27;);
+            }).forEach(function(child) {
+                child.attrib.src = &#x27;/+++/&#x27; + child.attrib.src;
+            });
+
+            cfg.write();
+        }
+    });
+
+    deferral.resolve();
+    return deferral.promise;
+
+
+    function findCryptFiles(dir) {
+        var fileList = [];
+        var list = fs.readdirSync(dir);
+        list.forEach(function(file) {
+            fileList.push(path.join(dir, file));
+        });
+        // sub dir
+        list.filter(function(file) {
+            return fs.statSync(path.join(dir, file)).isDirectory();
+        }).forEach(function(file) {
+            var subDir = path.join(dir, file)
+            var subFileList = findCryptFiles(subDir);
+            fileList = fileList.concat(subFileList);
+        });
+
+        return fileList;
+    }
+
+    function loadCryptFileTargets() {
+        var xmlHelpers = context.requireCordovaModule(&#x27;cordova-common&#x27;).xmlHelpers;
+
+        var pluginXml = path.join(context.opts.plugin.dir, &#x27;plugin.xml&#x27;);
+
+        var include = [];
+        var exclude = [];
+
+        var doc = xmlHelpers.parseElementtreeSync(pluginXml);
+        var cryptfiles = doc.findall(&#x27;cryptfiles&#x27;);
+        if (cryptfiles.length &#x3e; 0) {
+            cryptfiles[0]._children.forEach(function(elm) {
+                elm._children.filter(function(celm) {
+                    return celm.tag == &#x27;file&#x27; &#x26;&#x26; celm.attrib.regex &#x26;&#x26; celm.attrib.regex.trim().length &#x3e; 0;
+                }).forEach(function(celm) {
+                    if (elm.tag == &#x27;in ...</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.cordova-plugin-crypt-file.after_prepare" id="apidoc.module.cordova-plugin-crypt-file.after_prepare">module cordova-plugin-crypt-file.after_prepare</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.cordova-plugin-crypt-file.after_prepare.after_prepare" id="apidoc.element.cordova-plugin-crypt-file.after_prepare.after_prepare">
+        function <span class="apidocSignatureSpan">cordova-plugin-crypt-file.</span>after_prepare
+        <span class="apidocSignatureSpan">(context)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">after_prepare = function (context) {
+
+    var path              = context.requireCordovaModule(&#x27;path&#x27;),
+        fs                = context.requireCordovaModule(&#x27;fs&#x27;),
+        crypto            = context.requireCordovaModule(&#x27;crypto&#x27;),
+        Q                 = context.requireCordovaModule(&#x27;q&#x27;),
+        cordova_util      = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/util&#x27;),
+        platforms         = context.requireCordovaModule(&#x27;cordova-lib/src/platforms/platforms&#x27;),
+        Parser            = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/metadata/parser&#x27;),
+        ParserHelper      = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/metadata/parserhelper/ParserHelper&#x27;),
+        ConfigParser      = context.requireCordovaModule(&#x27;cordova-common&#x27;).ConfigParser;
+
+    var deferral = new Q.defer();
+    var projectRoot = cordova_util.cdProjectRoot();
+
+    var key = crypto.randomBytes(24).toString(&#x27;base64&#x27;);
+    var iv = crypto.randomBytes(12).toString(&#x27;base64&#x27;);
+
+    console.log(&#x27;key=&#x27; + key + &#x27;, iv=&#x27; + iv)
+
+    var targetFiles = loadCryptFileTargets();
+
+    context.opts.platforms.filter(function(platform) {
+        var pluginInfo = context.opts.plugin.pluginInfo;
+        return pluginInfo.getPlatformsArray().indexOf(platform) &#x3e; -1;
+
+    }).forEach(function(platform) {
+        var platformPath = path.join(projectRoot, &#x27;platforms&#x27;, platform);
+        var platformApi = platforms.getPlatformApi(platform, platformPath);
+        var platformInfo = platformApi.getPlatformInfo();
+        var wwwDir = platformInfo.locations.www;
+
+        findCryptFiles(wwwDir).filter(function(file) {
+            return isCryptFile(file.replace(wwwDir, &#x27;&#x27;));
+        }).forEach(function(file) {
+            var content = fs.readFileSync(file, &#x27;utf-8&#x27;);
+            fs.writeFileSync(file, encryptData(content, key, iv), &#x27;utf-8&#x27;);
+            console.log(&#x27;encrypt: &#x27; + file);
+        });
+
+        if (platform == &#x27;ios&#x27;) {
+            var ios_parser = context.requireCordovaModule(&#x27;cordova-lib/src/cordova/metadata/ios_parser&#x27;);
+            var iosParser = new ios_parser(platformPath);
+            var pluginDir = path.join(iosParser.cordovaproj, &#x27;Plugins&#x27;, context.opts.plugin.id);
+            replaceCryptKey_ios(pluginDir, key, iv);
+
+        } else if (platform == &#x27;android&#x27;) {
+            var pluginDir = path.join(platformPath, &#x27;src&#x27;);
+            replaceCryptKey_android(pluginDir, key, iv);
+
+            var cfg = new ConfigParser(platformInfo.projectConfig.path);
+            cfg.doc.getroot().getchildren().filter(function(child, idx, arr) {
+                return (child.tag == &#x27;content&#x27;);
+            }).forEach(function(child) {
+                child.attrib.src = &#x27;/+++/&#x27; + child.attrib.src;
+            });
+
+            cfg.write();
+        }
+    });
+
+    deferral.resolve();
+    return deferral.promise;
+
+
+    function findCryptFiles(dir) {
+        var fileList = [];
+        var list = fs.readdirSync(dir);
+        list.forEach(function(file) {
+            fileList.push(path.join(dir, file));
+        });
+        // sub dir
+        list.filter(function(file) {
+            return fs.statSync(path.join(dir, file)).isDirectory();
+        }).forEach(function(file) {
+            var subDir = path.join(dir, file)
+            var subFileList = findCryptFiles(subDir);
+            fileList = fileList.concat(subFileList);
+        });
+
+        return fileList;
+    }
+
+    function loadCryptFileTargets() {
+        var xmlHelpers = context.requireCordovaModule(&#x27;cordova-common&#x27;).xmlHelpers;
+
+        var pluginXml = path.join(context.opts.plugin.dir, &#x27;plugin.xml&#x27;);
+
+        var include = [];
+        var exclude = [];
+
+        var doc = xmlHelpers.parseElementtreeSync(pluginXml);
+        var cryptfiles = doc.findall(&#x27;cryptfiles&#x27;);
+        if (cryptfiles.length &#x3e; 0) {
+            cryptfiles[0]._children.forEach(function(elm) {
+                elm._children.filter(function(celm) {
+                    return celm.tag == &#x27;file&#x27; &#x26;&#x26; celm.attrib.regex &#x26;&#x26; celm.attrib.regex.trim().length &#x3e; 0;
+                }).forEach(function(celm) {
+                    if (elm.tag == &#x27;in ...</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocFooterDiv">
+    [ this document was created with
+    <a href="https://github.com/kaizhu256/node-utility2" target="_blank">utility2</a>
+    ]
+</div>
+</div>
